@@ -10,6 +10,7 @@ let form = document.querySelector("#form")
 let list = document.querySelector("#city-list")
 let geoButton = document.querySelector("#geo-button")
 let cityInfo = document.querySelector("#city-info")
+let infoSection = document.querySelector("#info-section")
 
 async function regions() {
     let json = await getData(base + regionEP)
@@ -90,14 +91,15 @@ async function clickHandler() {
 
     navigator.geolocation.getCurrentPosition(async (position) => {
         let { latitude: lat, longitude: lon } = position.coords
-        console.log(lat, lon)
-        // curl 'https://geo.api.gouv.fr/communes?lat=48.5771022&lon=7.7662813&fields=nom,surface,population'
 
-        let json = await getData(`${base}${cityEP}?lat=${lat}&lon=${lon}&fields=nom,surface,population`)
+        let json = await getData(`${base}${cityEP}?lat=${lat}&lon=${lon}&fields=nom,surface,population,contour`)
 
-        let {nom:name, population:pop, surface:sup} = json[0]
-        
-        console.log(name,pop,sup)
+        let { nom: name, population: pop, surface: sup, contour:border} = json[0]
+
+        border = border.coordinates[0]
+
+        // latitude and longitude are reversed for some reason
+        border = border.map(coords => coords.reverse())
 
         cityInfo.innerHTML = `
             <p>
@@ -107,6 +109,19 @@ async function clickHandler() {
                 Cette commune a une population de <strong>${pop} habitants</strong>, pour une superficie de <strong>${sup} m²</strong> !
             </p>
         `
+
+        let mapContainer = document.createElement("div")
+        mapContainer.id = "map"
+        infoSection.appendChild(mapContainer)
+
+        let map = L.map("map").setView([lat, lon], 13)
+        L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        }).addTo(map)
+
+        var polygon = L.polygon(border, {color: 'red'}).addTo(map)
+        map.fitBounds(polygon.getBounds())
     })
 }
 
